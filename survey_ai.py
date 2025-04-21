@@ -1,3 +1,4 @@
+import argparse
 import dotenv
 import getpass
 import os
@@ -19,27 +20,6 @@ from agentc_langgraph.graph import GraphRunnable
 
 # ------------------------------------------
 
-dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
-
-def _set_if_undefined(var: str):
-    if os.environ.get(var) is None:
-        os.environ[var] = getpass.getpass(f"Please provide your {var}")
-
-_set_if_undefined("OPENAI_API_KEY")
-
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
-
-# ------------------------------------------
-
-catalog = Catalog()
-
-app_span = catalog.Span(
-    name="customer survey expert AI",
-)
-
-
-# ------------------------------------------
-
 def get_next_node(last_message, goto: str):
     if "FINAL ANSWER" in last_message.content:
         # Any agent has decided that the work is done.
@@ -50,10 +30,10 @@ def get_next_node(last_message, goto: str):
 # ------------------------------------------
 
 class ResearchAgent(ReActAgent):
-    def __init__(self, span):
+    def __init__(self, catalog, span, llm):
         super().__init__(catalog=catalog,
-                         prompt_name="researcher_agent",
                          span=span,
+                         prompt_name="researcher_agent",
                          chat_model=llm)
 
     def _invoke(self, span, state, config):
@@ -77,10 +57,10 @@ class ResearchAgent(ReActAgent):
 # ------------------------------------------
 
 class CharterAgent(ReActAgent):
-    def __init__(self, span):
+    def __init__(self, catalog, span, llm):
         super().__init__(catalog=catalog,
-                         prompt_name="charter_agent",
                          span=span,
+                         prompt_name="charter_agent",
                          chat_model=llm)
 
     def _invoke(self, span, state, config):
@@ -104,15 +84,18 @@ class CharterAgent(ReActAgent):
 # ------------------------------------------
 
 class CustomerSurveyAgenticGraph(GraphRunnable):
-    def __init__(self):
+    def __init__(self, catalog, span):
         super().__init__(catalog=catalog,
-                         span=application_span)
+                         span=span)
 
     def compile(self):
         workflow = StateGraph(State)
         
-        workflow.add_node("researcher", ResearchAgent(span=self.span))
-        workflow.add_node("chart_generator", CharterAgent(span=self.span))
+        workflow.add_node("researcher",
+                          ResearchAgent(catalog=self.catalog, span=self.span))
+        
+        workflow.add_node("chart_generator",
+                          CharterAgent(catalog=self.catalog, span=self.span))
 
         workflow.add_edge(START, "researcher")
         
@@ -120,8 +103,8 @@ class CustomerSurveyAgenticGraph(GraphRunnable):
 
 # ------------------------------------------
 
-def run(user_input):
-    graph = CustomerSurveyAgenticGraph()
+def run(catalog, span, llm, user_input):
+    graph = CustomerSurveyAgenticGraph(catalog, span)
 
     application_span.log(content={"kind": "user", "value": user_input})
 
@@ -148,11 +131,39 @@ def run(user_input):
 
 # ------------------------------------------
 
-if __name__ == "main":
-    run("""
-            First, get the customer surveys created over the last 6 months,
-            then give a brief summary of them.
+def _set_if_undefined(var: str):
+    if os.environ.get(var) is None:
+        os.environ[var] = getpass.getpass(f"please provide env var: {var}")
 
-            Use pie charts as needed.
-        """)
+# ------------------------------------------
+
+if __name__ == "main":
+    dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
+
+    app_catalog = Catalog()
+
+    app_span = catalog.Span(
+        name="customer survey expert AI",
+    )
+
+    _set_if_undefined("OPENAI_API_KEY")
+
+    app_llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+    if parser is None:
+        parser = argparse.ArgumentParser()
+
+    input = """
+        First, get the customer surveys created over the last 6 months,
+        then give a brief summary of them.
+
+        Use pie charts as needed.
+    """
+
+    parser.add_argument("--input", type=str, default=input)
+
+    args = parser.parse_args()
+   
+    run(app_catalog, app_span, app_llm, args.input)
+)
 
