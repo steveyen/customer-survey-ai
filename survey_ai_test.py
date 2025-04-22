@@ -54,13 +54,16 @@ class TestSurveyAI(unittest.TestCase):
         d = debug_info()
 
         test_span = catalog.Span(
-            name=f"""{d.filename}_{d.function}"""
+            name=f"""{d.filename}#{d.function}"""
         )
-
-        survey_ai._set_if_undefined("OPENAI_API_KEY")
 
         with open("./angry-surveys.yaml", 'r') as f:
             cases = yaml.safe_load(file)
+
+            if False:
+                from agentc.evaluations import prioritize_cases
+                
+                cases = prioritize_cases(test_catalog, test_span, cases)
 
             for c_idx, c in enumerate(cases):
                 model = c.get("model", "gpt-4o")
@@ -75,7 +78,8 @@ class TestSurveyAI(unittest.TestCase):
 
                     test_span["metrics.RAGAS4"] = RAGAS4.evaluate_professionalism(results)
 
-                    test_span["metrics.evalgelion"] = evalgelion.process(results)
+                    test_span["metrics.evalgelion"] = evalgelion.process(
+                        "info-completeness", results)
 
 
 
