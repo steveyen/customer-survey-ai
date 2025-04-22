@@ -29,11 +29,11 @@ def get_next_node(last_message, goto: str):
 
 # ------------------------------------------
 
-class ResearchAgent(ReActAgent):
+class SurveyGeneratorAgent(ReActAgent):
     def __init__(self, catalog, span, llm):
         super().__init__(catalog=catalog,
                          span=span,
-                         prompt_name="researcher_agent",
+                         prompt_name="survey_generator_agent",
                          chat_model=llm)
 
     def _invoke(self, span, state, config):
@@ -44,23 +44,17 @@ class ResearchAgent(ReActAgent):
         goto = get_next_node(result["messages"][-1], "chart_generator")
         
         result["messages"][-1] = SystemMessage(
-            content=result["messages"][-1].content, name="researcher")
+            content=result["messages"][-1].content, name="survey_generator")
         
-        return Command(
-            update={
-                # share internal message history of research agent with other agents
-                "messages": result["messages"],
-            },
-            goto=goto,
-        )
+        return Command(update={"messages": result["messages"]}, goto=goto)
 
 # ------------------------------------------
 
-class CharterAgent(ReActAgent):
+class ChartGeneratorAgent(ReActAgent):
     def __init__(self, catalog, span, llm):
         super().__init__(catalog=catalog,
                          span=span,
-                         prompt_name="charter_agent",
+                         prompt_name="chart_generator_agent",
                          chat_model=llm)
 
     def _invoke(self, span, state, config):
@@ -68,22 +62,16 @@ class CharterAgent(ReActAgent):
         
         result = agent.invoke(state)
         
-        goto = get_next_node(result["messages"][-1], "researcher")
+        goto = get_next_node(result["messages"][-1], "survey_generator")
         
         result["messages"][-1] = SystemMessage(
-            content=result["messages"][-1].content, name="researcher")
+            content=result["messages"][-1].content, name="chart_generator")
         
-        return Command(
-            update={
-                # share internal message history of research agent with other agents
-                "messages": result["messages"],
-            },
-            goto=goto,
-        )
+        return Command(update={"messages": result["messages"]}, goto=goto)
 
 # ------------------------------------------
 
-class CustomerSurveyAgenticGraph(GraphRunnable):
+class CustomerSurveyAgentGraph(GraphRunnable):
     def __init__(self, catalog, span):
         super().__init__(catalog=catalog,
                          span=span)
@@ -91,30 +79,28 @@ class CustomerSurveyAgenticGraph(GraphRunnable):
     def compile(self):
         workflow = StateGraph(State)
         
-        workflow.add_node("researcher",
-                          ResearchAgent(catalog=self.catalog, span=self.span))
+        workflow.add_node("survey_generator",
+                          SurveyGeneratorAgent(catalog=self.catalog, span=self.span))
         
         workflow.add_node("chart_generator",
-                          CharterAgent(catalog=self.catalog, span=self.span))
+                          ChartGeneratorAgent(catalog=self.catalog, span=self.span))
 
-        workflow.add_edge(START, "researcher")
+        workflow.add_edge(START, "survey_generator")
         
         return workflow.compile()
 
 # ------------------------------------------
 
 def run(catalog, span, llm, user_input):
-    graph = CustomerSurveyAgenticGraph(catalog, span)
+    graph = CustomerSurveyAgentGraph(catalog, span)
 
-    application_span.log(content={"kind": "user", "value": user_input})
+    span.log(content={"kind": "user", "value": user_input})
 
     events = graph.stream(
-        {"messages": [("user", user_input)], "is_last_step": False, "previous_node": None},
-
-        # Maximum number of steps to take in the graph
-    
-        {"recursion_limit": 10},
-    )
+        {"messages": [("user", user_input)],
+         "is_last_step": False,
+         "previous_node": None},
+        {"recursion_limit": 10})
 
     msgs = []
 
@@ -138,32 +124,31 @@ def _set_if_undefined(var: str):
 # ------------------------------------------
 
 if __name__ == "main":
-    dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
+    parser = argparse.ArgumentParser()
 
-    app_catalog = Catalog()
-
-    app_span = catalog.Span(
-        name="customer survey expert AI",
-    )
-
-    _set_if_undefined("OPENAI_API_KEY")
-
-    app_llm = ChatOpenAI(model="gpt-4o", temperature=0)
-
-    if parser is None:
-        parser = argparse.ArgumentParser()
-
-    input = """
+    parser.add_argument("--input", type=str, default="""
         First, get the customer surveys created over the last 6 months,
         then give a brief summary of them.
 
         Use pie charts as needed.
-    """
-
-    parser.add_argument("--input", type=str, default=input)
+    """)
+    
+    parser.add_argument("--model", type=str, default="gpt-40")
+    
+    parser.add_argument("--temperature", type=int, default=0)
 
     args = parser.parse_args()
    
-    run(app_catalog, app_span, app_llm, args.input)
+    dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
+
+    top_catalog = Catalog()
+
+    top_span = catalog.Span(name="survey_ai.py")
+
+    _set_if_undefined("OPENAI_API_KEY")
+
+    top_llm = ChatOpenAI(model=args.model, temperature=args.temperature / 100.0)
+
+    run(top_catalog, top_span, top_llm, args.input)
 )
 
