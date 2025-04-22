@@ -1,0 +1,19 @@
+
+
+
+$ git status
+$ git diff
+$ pytest
+$ agentc index
+$ pytest
+$ pytest
+$ agentc index
+$ agentc publish
+$ pytest
+$ pytest
+$ agentc index
+$ pytest
+$ git add ...
+$ git commit
+
+goto start

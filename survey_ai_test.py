@@ -60,7 +60,7 @@ class TestSurveyAI(unittest.TestCase):
         with open("./angry-surveys.yaml", 'r') as f:
             cases = yaml.safe_load(file)
 
-            if False:
+            if True:
                 from agentc.evaluations import prioritize_cases
                 
                 cases = prioritize_cases(test_catalog, test_span, cases)
@@ -81,5 +81,15 @@ class TestSurveyAI(unittest.TestCase):
                     test_span["metrics.evalgelion"] = evalgelion.process(
                         "info-completeness", results)
 
+                    ok = True
+                    for x in results:
+                        if "sh*t" in x:
+                            ok = False
+
+                    test_span["metrics.cuss-words"] = ok
+
+                    test_span["metrics.uppercase"] = results.contains_uppercase()
+
+                print("done with test case:", c_idx)
 
 

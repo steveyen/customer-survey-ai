@@ -133,7 +133,7 @@ if __name__ == "main":
         Use pie charts as needed.
     """)
     
-    parser.add_argument("--model", type=str, default="gpt-40")
+    parser.add_argument("--model", type=str, default="gpt-4o")
     
     parser.add_argument("--temperature", type=int, default=0)
 
