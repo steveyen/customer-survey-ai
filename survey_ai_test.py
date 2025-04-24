@@ -81,14 +81,35 @@ class TestSurveyAI(unittest.TestCase):
                     test_span["metrics.evalgelion"] = evalgelion.process(
                         "info-completeness", results)
 
-                    ok = True
+                    # Some custom evaluation metrics or scores.
+                    
+                    from bad_words import STANDARD_BAD_WORDS
+                        
+                    bad_words_used = 0
                     for x in results:
-                        if "sh*t" in x:
-                            ok = False
+                        for bad_word in STANDARD_BAD_WORDS:
+                            if bad_word in x:
+                                bad_words_used += 1
 
-                    test_span["metrics.cuss-words"] = ok
+                    test_span["metrics.bad-words-used"] = bad_words_used
 
                     test_span["metrics.uppercase"] = results.contains_uppercase()
+
+                    # ------------------------------------
+
+                    llm_as_judge_args = { ... }
+
+                    llm_as_judge_span = test_span.new("metrics.llm_as_judge", args=llm_as_judge_args)
+
+                    from agentc.evaluations import previous_results
+
+                    result = previous_results.lookup(test_catalog, llm_as_judge_span)
+                    if result is None:
+                        # Expensive call that's sometimes avoided when
+                        #a previous result is found in our activity logs.
+                        result = RAGAS4.llm_as_judge(llm_as_judge_args)
+
+                    llm_as_judge_span["result"] = result
 
                 print("done with test case:", c_idx)
 
